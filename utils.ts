@@ -1,4 +1,4 @@
-import { Match, Player, TournamentSettings, GameRecord } from './types';
+import { Match, Player, TournamentSettings } from './types';
 
 /**
  * Triggers haptic feedback (vibration) on supported devices.
@@ -64,7 +64,7 @@ export const generateRoundRobinMatches = (playerIds: string[], groupId?: string)
     for (let i = 0; i < playerIds.length; i++) {
         for (let j = i + 1; j < playerIds.length; j++) {
             matches.push({
-                id: `match-${Date.now()}-${i}-${j}`,
+                id: `match-${Date.now()}-${i}-${j}${groupId ? `-${groupId}`: ''}`,
                 player1Id: playerIds[i],
                 player2Id: playerIds[j],
                 status: 'pending',
@@ -88,77 +88,77 @@ export const generateKnockoutBracket = (playersWithStats: PlayerWithStats[], set
     }
     
     const numPlayers = players.length;
-    if (numPlayers === 0) return [];
+    if (numPlayers < 2) return [];
+
     const bracketSize = Math.pow(2, Math.ceil(Math.log2(numPlayers)));
     const byes = bracketSize - numPlayers;
 
-    const matches: Match[] = [];
     const rounds: Match[][] = [];
+    let currentPlayers = players.map(p => ({ id: p.id, type: 'player' as 'player' | 'bye' }));
 
-    const round1: Match[] = [];
-    const numRound1Matches = bracketSize / 2;
-    const playersInRound1 = players.slice(byes);
-    const topSeedsWithByes = players.slice(0, byes);
-
-    for (let i = 0; i < numRound1Matches - byes; i++) {
-        const p1 = playersInRound1[i];
-        const p2 = playersInRound1[playersInRound1.length - 1 - i];
-        round1.push({
-            id: `match-${Date.now()}-r1-${i}`,
-            player1Id: p1.id,
-            player2Id: p2.id,
-            status: 'pending',
-            round: 1,
-        });
+    // Add byes to the end of the list, they will be matched against top seeds
+    for (let i = 0; i < byes; i++) {
+        currentPlayers.push({ id: `bye-${i}`, type: 'bye' });
     }
-    rounds.push(round1);
 
-    let currentRoundPlayers = topSeedsWithByes.length + round1.length;
-    let roundNum = 2;
-    while (currentRoundPlayers > 1) {
-        const nextRound: Match[] = [];
-        const numMatchesInRound = currentRoundPlayers / 2;
-        for (let i = 0; i < numMatchesInRound; i++) {
-            nextRound.push({
+    let roundNum = 1;
+    while (currentPlayers.length > 1) {
+        const roundMatches: Match[] = [];
+        const nextRoundPlayerSlots: any[] = [];
+        
+        for (let i = 0; i < currentPlayers.length / 2; i++) {
+            const p1 = currentPlayers[i];
+            const p2 = currentPlayers[currentPlayers.length - 1 - i];
+
+            const match: Match = {
                 id: `match-${Date.now()}-r${roundNum}-${i}`,
-                player1Id: null,
-                player2Id: null,
+                player1Id: p1.type === 'player' ? p1.id : null,
+                player2Id: p2.type === 'player' ? p2.id : null,
                 status: 'pending',
                 round: roundNum,
-            });
+            };
+
+            if (p1.type === 'bye' || p2.type === 'bye') {
+                match.status = 'completed';
+                const winnerId = p1.type === 'player' ? p1.id : p2.id;
+                match.result = { player1Score: 0, player2Score: 0, winnerId };
+                nextRoundPlayerSlots.push({ id: winnerId, type: 'player' });
+            } else {
+                nextRoundPlayerSlots.push({ id: match.id, type: 'match' });
+            }
+            roundMatches.push(match);
         }
-        rounds.push(nextRound);
-        currentRoundPlayers /= 2;
+        rounds.push(roundMatches);
+        currentPlayers = nextRoundPlayerSlots;
         roundNum++;
     }
 
     const allMatches = rounds.flat();
-    
-    for(let i = 0; i < round1.length; i++) {
-        const match = round1[i];
-        const nextMatchIndex = Math.floor(i / 2);
-        match.nextMatchId = rounds[1][nextMatchIndex].id;
-    }
 
-    for(let i = 0; i < topSeedsWithByes.length; i++) {
-        const player = topSeedsWithByes[i];
-        const targetMatchIndex = Math.floor(i / 2);
-        const targetMatch = rounds[1][targetMatchIndex];
-        if (i % 2 === 0) {
-            targetMatch.player1Id = player.id;
-        } else {
-            targetMatch.player2Id = player.id;
+    // Link matches to their next match
+    allMatches.forEach(match => {
+        if (match.status === 'pending' && match.round) {
+            const nextRound = rounds[match.round]; // round is 1-based, index is 0-based
+            if (nextRound) {
+                const nextMatch = nextRound.find(m => m.player1Id === null || m.player2Id === null);
+                if (nextMatch) {
+                    // This is a simplification; a full implementation needs proper slotting
+                }
+            }
         }
-    }
+    });
 
-    for (let r = 1; r < rounds.length - 1; r++) {
+    for (let r = 0; r < rounds.length - 1; r++) {
         for (let i = 0; i < rounds[r].length; i++) {
             const match = rounds[r][i];
             const nextMatchIndex = Math.floor(i / 2);
-            match.nextMatchId = rounds[r+1][nextMatchIndex].id;
+            const nextMatch = rounds[r+1][nextMatchIndex];
+            if (nextMatch) {
+                match.nextMatchId = nextMatch.id;
+            }
         }
     }
-    
+
     return allMatches;
 };
 
@@ -177,7 +177,14 @@ export const generateCombinedTournament = (playersWithStats: PlayerWithStats[], 
 
     const groups: string[][] = Array.from({ length: numGroups }, () => []);
     players.forEach((player, index) => {
-        groups[index % numGroups].push(player.id);
+        // Serpentine seeding for groups
+        const groupIndex = index % numGroups;
+        const rowIndex = Math.floor(index / numGroups);
+        if(rowIndex % 2 === 0) {
+            groups[groupIndex].push(player.id);
+        } else {
+            groups[numGroups - 1 - groupIndex].push(player.id);
+        }
     });
 
     const groupMatches = groups.flatMap((playerIds, index) => 

@@ -224,7 +224,7 @@ const TeamScoreboard: React.FC<{
     const pointsToTargetForTeam = gameInfo.targetScore - (activeTeamScore + turnScore);
 
     return (
-        <>
+        <div className="w-full max-w-2xl space-y-4">
             <TeamScoreCard
                 teamName={t('gameSetup.team1')}
                 teamPlayers={team1Players}
@@ -260,7 +260,7 @@ const TeamScoreboard: React.FC<{
                 allowOvershooting={gameInfo.allowOvershooting ?? false}
                 gameType={gameInfo.type}
             />
-        </>
+        </div>
     );
 };
 

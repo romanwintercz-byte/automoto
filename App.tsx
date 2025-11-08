@@ -1,9 +1,6 @@
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-// Fix: Changed immer import to a direct CDN URL to resolve build error.
-import { produce } from 'https://aistudiocdn.com/immer@^10.2.0';
+import { produce } from 'immer';
 
 // Components
 import HeaderNav from './components/HeaderNav';
@@ -318,7 +315,6 @@ const App: React.FC = () => {
                 const groupPlayerIds = [...new Set(groupMatches.filter(m => m.groupId === groupId).flatMap(m => [m.player1Id, m.player2Id]))];
                 
                 const stats: Record<string, { points: number, scoreDiff: number }> = {};
-                // Fix: Filter out null player IDs before using them as index keys to prevent runtime errors.
                 groupPlayerIds.filter((pId): pId is string => !!pId).forEach(pId => { stats[pId] = { points: 0, scoreDiff: 0 }; });
 
                 groupMatches.filter(m => m.groupId === groupId).forEach(m => {
@@ -346,9 +342,8 @@ const App: React.FC = () => {
                 advancingPlayers[groupId] = groupStandings[groupId].slice(0, settings.playersAdvancing).map(p => p.playerId);
             });
             
-            // Seed knockout bracket (e.g., A1 vs B2, B1 vs A2)
             const firstRoundKnockout = knockoutMatches.filter(m => m.round === 1);
-            let playerIndex = 0;
+            let matchIndex = 0;
             for (let i = 0; i < (settings.numGroups || 0) / 2; i++) {
                 const groupAId = `group-${i * 2}`;
                 const groupBId = `group-${i * 2 + 1}`;
@@ -357,13 +352,17 @@ const App: React.FC = () => {
                 const groupBWinners = advancingPlayers[groupBId];
 
                 for (let j = 0; j < (settings.playersAdvancing || 0); j++) {
-                    const match1 = firstRoundKnockout[playerIndex++];
-                    match1.player1Id = groupAWinners[j];
-                    match1.player2Id = groupBWinners[groupBWinners.length - 1 - j];
+                    const match1 = firstRoundKnockout[matchIndex++];
+                    if (match1) {
+                        match1.player1Id = groupAWinners[j];
+                        match1.player2Id = groupBWinners[groupBWinners.length - 1 - j];
+                    }
 
-                    const match2 = firstRoundKnockout[playerIndex++];
-                    match2.player1Id = groupBWinners[j];
-                    match2.player2Id = groupAWinners[groupAWinners.length - 1 - j];
+                    const match2 = firstRoundKnockout[matchIndex++];
+                    if (match2) {
+                      match2.player1Id = groupBWinners[j];
+                      match2.player2Id = groupAWinners[groupAWinners.length - 1 - j];
+                    }
                 }
             }
 
@@ -403,7 +402,8 @@ const App: React.FC = () => {
                     Object.assign(tournament, updatedTournament);
                 }
             } else {
-                if (tournament.matches.filter(m => !m.groupId).every(m => m.status === 'completed')) {
+                const relevantMatches = tournament.matches.filter(m => tournament.format !== 'combined' || m.round !== undefined);
+                if (relevantMatches.every(m => m.status === 'completed')) {
                     tournament.status = 'completed';
                 }
             }
@@ -452,7 +452,7 @@ const App: React.FC = () => {
         }
         
         const newTournament: Tournament = { id: `tourn-${Date.now()}`, name, playerIds, format: settings.format, settings, matches, status: 'ongoing', createdAt: new Date().toISOString(), stage };
-        setTournaments(prev => [...prev, newTournament]);
+        setTournaments(prev => [...prev, newTournament].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     };
 
     const handleStartMatch = (tournament: Tournament, match: Match) => {
@@ -522,7 +522,7 @@ const App: React.FC = () => {
             </main>
             {renderModals()}
             {showSettings && <SettingsModal currentTheme={theme} onThemeChange={setTheme} onClose={() => setShowSettings(false)} appData={appData} />}
-            <footer className="fixed bottom-0 left-0 right-0 p-2 text-center text-xs text-[--color-text-secondary]/50 flex justify-between items-center">
+            <footer className="fixed bottom-0 left-0 right-0 p-2 text-center text-xs text-[--color-text-secondary]/50 flex justify-between items-center bg-[--color-surface]/50 backdrop-blur-sm">
                 <span>{t('footer')}</span>
                 {installPrompt && (
                     <button onClick={() => installPrompt.prompt()} className="bg-[--color-primary] text-white font-bold py-1 px-3 rounded-md text-xs shadow-md">

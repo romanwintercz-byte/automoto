@@ -156,13 +156,13 @@ const StatsView: React.FC<{ stats: AllStats; players: Player[], completedGamesLo
             streaks[p.id] = Math.max(max, current);
         });
 
-        const longestStreakPlayerId = Object.keys(streaks).reduce((a, b) => streaks[a] > streaks[b] ? a : b);
+        const longestStreakPlayerId = Object.keys(streaks).reduce((a, b) => (streaks[a] > streaks[b] ? a : b), null as string | null);
 
         return {
             highestAvg,
             highestScore,
             fewestInnings: fewestInnings && fewestInnings.value !== Infinity ? fewestInnings : null,
-            longestStreak: { value: streaks[longestStreakPlayerId], playerId: longestStreakPlayerId }
+            longestStreak: longestStreakPlayerId ? { value: streaks[longestStreakPlayerId], playerId: longestStreakPlayerId } : null
         };
 
     }, [selectedGameType, completedGamesLog, players]);

@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useCallback, useEffect, useRef, forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tournament, Player, GameRecord, TournamentSettings, Match, TournamentFormat, SingleTournamentExportData } from '../types';
