@@ -1,7 +1,4 @@
 {
-  "name": "Vite React Starter pro Vercel",
-  "description": "Jednoduchý a čistý výchozí bod pro React aplikaci postavenou na Vite, TypeScriptu a Tailwind CSS, připravenou k nasazení na Vercel.",
-  "requestFramePermissions": [
-    "camera"
-  ]
+  "name": "Vercel React Starter",
+  "description": "A minimal, pre-configured React + Vite + TypeScript starter template for easy deployment to Vercel."
 }
