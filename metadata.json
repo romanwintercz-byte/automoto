@@ -1,4 +1,5 @@
 {
-  "name": "Vercel React Starter",
-  "description": "A minimal, pre-configured React + Vite + TypeScript starter template for easy deployment to Vercel."
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }
